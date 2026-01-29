@@ -1,0 +1,10 @@
+coco_dataset/
+__pycache__/
+
+input_data/*
+!input_data/README.txt
+
+vis_output/
+
+*.pt
+*.pth
