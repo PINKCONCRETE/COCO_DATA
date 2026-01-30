@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Configuration
-MODEL_ID="Qwen/Qwen3-VL-8B-Instruct"
+MODEL_ID="Qwen/Qwen3-VL-8B-Instruct" # Specify your desired model here
 UDS_PATH="/tmp/vllm-server.sock"
 
 echo "Starting vLLM OpenAI-compatible server..."

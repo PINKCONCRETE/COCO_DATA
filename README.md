@@ -1,76 +1,82 @@
-# VLM + GroundingDINO 混合检测系统
+# COCO DATA
 
-## 🎯 系统架构
+## 🎯 System Architecture
 
-结合两个模型的优势：
-- **VLM (Qwen-VL)**: 识别图片中的物体类别（擅长识别）
-- **GroundingDINO**: 基于类别生成精确边界框（擅长定位）
+Combine the strengths of two models:
+- **VLM (Qwen-VL)**: Identify object categories in images (Specialized in Recognition)
+- **GroundingDINO**: Generate precise bounding boxes based on categories (Specialized in Localization)
 
-## 🔄 工作流程
+## 🔄 Workflow
 
 ```
-视频/图片
+Video/Image
     ↓
 [FrameExtractor]
-提取JPG图片序列
+Extract JPG image sequence
     ↓
 [VLMCategoryDetector]
-VLM识别物体类别
-输出: ["person", "car", "dog", ...]
+VLM identifies object categories
+Output: ["person", "car", "dog", ...]
     ↓
 [GroundingDINODetector]
-基于类别生成精确bbox
-输出: [{class: "person", bbox: [x1,y1,x2,y2]}, ...]
+Generate precise bbox based on categories
+Output: [{class: "person", bbox: [x1,y1,x2,y2]}, ...]
     ↓
 [Visualizer]
-可视化结果
+Visualize results
     ↓
 [COCODatasetBuilder]
-生成COCO数据集
+Generate COCO dataset
     ↓
-YOLO模型训练
+YOLO Model Training
 ```
 
-## 📋 优势
+## 🚀 Quick Start
 
-| 特性 | 纯VLM方案 | VLM + GroundingDINO |
-|------|----------|---------------------|
-| 类别识别 | ✅ 准确 | ✅ 准确 |
-| 位置检测 | ⚠️ 较弱 | ✅ 精确 |
-| 边界框质量 | ⚠️ 一般 | ✅ 高质量 |
-| 处理速度 | ✅ 快 | ⚠️ 较慢（两阶段）|
+### 1. Environment Preparation
 
-## 🚀 快速开始
+#### 1.1 Clone Code
 
-### 1. 环境准备
+```
+git clone -r https://github.com/PINKCONCRETE/COCO_DATA
+```
+
+#### 1.2 Configure Base Environment
 
 ```bash
-# 安装基础依赖
-pip install -r requirements_coco.txt
+conda create -n coco_data python=3.11
 
-# 安装GroundingDINO依赖
-cd GroundingDINO
-pip install -e .
+conda activate coco_data
+# Install base dependencies
+pip install -r requirements.txt
 ```
 
-### 2. 下载GroundingDINO模型
+```bash
+# Install GroundingDINO dependencies
+cd GroundingDINO
+pip install -r requirements.txt
+pip install -e . # If issues try: python -m pip install --no-build-isolation -e .
+```
+
+### 2. Download GroundingDINO Model
 
 ```bash
 cd GroundingDINO
 mkdir -p weights
 
-# 下载模型权重
+# Download model weights
 wget -P weights https://github.com/IDEA-Research/GroundingDINO/releases/download/v0.1.0-alpha/groundingdino_swint_ogc.pth
 ```
 
-### 3. 启动VLM服务器
+### 3. Configure and Start VLM Server
 
 ```bash
-cd preprocessor
-bash start_vllm_server.sh
+conda create -n vllm python=3.11
+pip install vllm
+bash start_vllm_server.sh # Note: Select appropriate VLM for your machine
 ```
 
-### 4. 准备数据
+### 4. Prepare Data
 
 ```bash
 mkdir -p input_data
@@ -78,59 +84,114 @@ cp your_videos/*.mp4 input_data/
 cp your_images/*.jpg input_data/
 ```
 
-### 5. 运行生成
+### 5. Run Generation
 
+#### 5.1 Fully Automatic Mode (Default)
+Run directly, the program will automatically complete all steps:
 ```bash
 python generate_coco_with_gdino.py
 ```
 
-## ⚙️ 配置说明
+#### 5.2 Global Review Mode (Recommended)
+Scans only the first frame of each video/image to generate a global object list. After editing and confirming, apply to all frames. Suitable for data with fixed scenes.
+```bash
+# 1. Scan to generate global list
+python generate_coco_with_gdino.py --review --global
 
-### 核心配置
+# 2. Program pauses, manually edit coco_dataset/global_categories.json
+
+# 3. Resume generation
+python generate_coco_with_gdino.py --global --resume global_categories.json
+```
+
+#### 5.3 Per-Image Review Mode
+VLM identifies every image to generate a complete result list. You can check and correct recognition results one by one. Suitable for scenarios with large changes where every image has different objects.
+```bash
+# 1. Run and generate initial results
+python generate_coco_with_gdino.py --review
+
+# 2. Program pauses, manually edit coco_dataset/vlm_predictions.json
+#    (File contains image_id and corresponding categories for each image)
+
+# 3. Resume generation (Directly use your corrected results to run GroundingDINO)
+python generate_coco_with_gdino.py --resume vlm_predictions.json
+```
+
+### 6. Train Model
+
+After data generation is complete, directly run the training script:
+
+```bash
+python train_coco.py
+```
+- Defaults to `yolo26x.pt` (High accuracy). For speedup, modify code to use `yolo26n.pt`.
+- Training results (weights, logs) are saved in `coco_data/runs/train/coco_finetune/` directory.
+
+### 7. Model Inference (Prediction)
+
+Use the trained model to detect new images or videos:
+
+```bash
+# Image Inference
+python predict_coco.py --model model.pt --source image.jpg
+
+# Video Inference
+python predict_coco.py --model model.pt --source video.mp4 --output results/
+```
+Parameters:
+- `--model`: Path to trained model (`.pt`)
+- `--source`: Input image or video path
+- `--conf`: Confidence threshold (default 0.25)
+- `--show`: Show results in real-time (GUI required)
+- `--save-txt`: Save detection box coordinates to txt file
+
+## ⚙️ Configuration
+
+### Core Config
 
 ```python
 config = COCOConfig(
-    # 输入输出
+    # Input/Output
     input_path=Path("input_data"),
     output_dir=Path("coco_dataset"),
-    frame_interval=30,  # 视频采样间隔
+    frame_interval=30,  # Video frame sampling interval
     
-    # VLM配置
+    # VLM Config
     vlm_model_id="Qwen/Qwen3-VL-8B-Instruct",
-    vlm_workers=8,  # VLM并行数
+    vlm_workers=8,  # VLM parallelism
     
-    # GroundingDINO配置
+    # GroundingDINO Config
     gdino_config_path=Path("GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py"),
     gdino_checkpoint_path=Path("GroundingDINO/weights/groundingdino_swint_ogc.pth"),
-    gdino_box_threshold=0.35,      # 边界框阈值
-    gdino_text_threshold=0.25,     # 文本阈值
-    gdino_device="cuda",           # GPU设备
+    gdino_box_threshold=0.35,      # Bounding Box threshold
+    gdino_text_threshold=0.25,     # Text threshold
+    gdino_device="cuda",           # GPU Device
     
-    # 其他
-    visualize=True,  # 生成可视化
+    # Others
+    visualize=True,  # Generate visualization
 )
 ```
 
-### 阈值调整
+### Threshold Adjustment
 
 - **gdino_box_threshold** (0.35)
-  - 越高：检测越严格，假阳性越少
-  - 越低：检测越宽松，可能有假阳性
+  - Higher: Stricter detection, fewer false positives
+  - Lower: Looser detection, possible false positives
   
 - **gdino_text_threshold** (0.25)
-  - 控制文本匹配的严格程度
-  - 越高：只保留高置信度的检测
+  - Controls strictness of text matching
+  - Higher: Keep only high confidence detections
 
-## 🏗️ 核心类说明
+## 🏗️ Core Classes
 
 ### VLMCategoryDetector
-- **功能**: 使用VLM识别物体类别
-- **输入**: 图片
-- **输出**: 类别列表 `["person", "car", ...]`
-- **提示词**: 专门设计用于类别识别
+- **Function**: Identify object categories using VLM
+- **Input**: Image
+- **Output**: Category list `["person", "car", ...]`
+- **Prompt**: Specifically designed for category identification
 
 ```python
-# 示例输出
+# Output Example
 {
     "image_id": 0,
     "image_path": "images/image_00000000.jpg",
@@ -139,12 +200,12 @@ config = COCOConfig(
 ```
 
 ### GroundingDINODetector
-- **功能**: 基于类别生成精确边界框
-- **输入**: 图片 + 类别列表
-- **输出**: 检测结果（类别 + bbox）
+- **Function**: Generate precise bounding boxes based on categories
+- **Input**: Image + Category List
+- **Output**: Detection results (Class + bbox)
 
 ```python
-# 示例输出
+# Output Example
 {
     "image_id": 0,
     "image_path": "images/image_00000000.jpg",
@@ -163,50 +224,72 @@ config = COCOConfig(
 }
 ```
 
-## 📊 输出格式
+## 📊 Output Format
 
-### COCO annotations.json
+### Generated Dataset Structure
+The program will automatically split data into train/val/test (7:2:1) and generate both COCO and YOLO format annotations.
 
+```
+coco_dataset/
+├── dataset.yaml         # YOLO training config
+├── images/
+│   ├── train/           # Train images
+│   ├── val/             # Validation images
+│   └── test/            # Test images
+├── labels/              # YOLO format labels (.txt)
+│   ├── train/
+│   ├── val/
+│   └── test/
+├── annotations/         # COCO format labels (.json)
+│   ├── train.json
+│   ├── val.json
+│   └── test.json
+└── visualizations/      # Visualization results
+```
+
+### Annotation File Examples
+
+#### COCO Format (annotations/train.json)
 ```json
 {
-  "info": {
-    "description": "COCO Dataset generated by VLM + GroundingDINO",
-    "version": "1.0"
-  },
   "images": [...],
   "annotations": [
     {
       "id": 1,
       "image_id": 0,
       "category_id": 1,
-      "bbox": [100, 200, 300, 400],  # COCO格式: [x, y, w, h]
+      "bbox": [100, 200, 300, 400],  # [x, y, w, h]
       "area": 120000,
-      "iscrowd": 0,
-      "score": 0.95  # GroundingDINO置信度
+      "iscrowd": 0
     }
   ],
-  "categories": [
-    {"id": 1, "name": "person", "supercategory": "object"}
-  ]
+  "categories": [...]
 }
 ```
 
-## 🎨 两阶段检测流程示例
+#### YOLO Format (labels/train/image_0.txt)
+```text
+# <class_id> <x_center> <y_center> <width> <height> (Normalized)
+0 0.532 0.485 0.15 0.35
+1 0.221 0.334 0.12 0.22
+```
 
-### 阶段1: VLM类别识别
+## 🎨 Two-Stage Detection Example
 
-**输入图片**: test1.jpg
+### Stage 1: VLM Category Recognition
 
-**VLM输出**:
+**Input Image**: test1.jpg
+
+**VLM Output**:
 ```json
 ["person", "orange", "book", "pink plate", "bamboo basket", "orange cup"]
 ```
 
-### 阶段2: GroundingDINO边界框检测
+### Stage 2: GroundingDINO Bounding Box Detection
 
-**输入**: test1.jpg + "person, orange, book, pink plate, bamboo basket, orange cup"
+**Input**: test1.jpg + "person, orange, book, pink plate, bamboo basket, orange cup"
 
-**GroundingDINO输出**:
+**GroundingDINO Output**:
 ```json
 [
   {"class": "person", "bbox": [0.2, 0.1, 0.8, 0.9], "confidence": 0.95},
@@ -218,185 +301,142 @@ config = COCOConfig(
 ]
 ```
 
-## 🔧 性能优化
+## 🔧 Performance Optimization
 
-### GPU内存优化
+### GPU Memory Optimization
 
 ```python
 config = COCOConfig(
     gdino_device="cuda",
-    vlm_workers=4,  # 减少VLM并行数
-    num_workers=2,  # 减少帧提取并行数
+    vlm_workers=4,  # Reduce VLM workers
+    num_workers=2,  # Reduce frame extraction workers
 )
 ```
 
-### 速度优化
+### Speed Optimization
 
 ```python
 config = COCOConfig(
-    frame_interval=60,  # 增大采样间隔
-    visualize=False,    # 关闭可视化
-    vlm_workers=16,     # 增加VLM并行
+    frame_interval=60,  # Increase sample interval
+    visualize=False,    # Disable visualization
+    vlm_workers=16,     # Increase VLM workers
 )
 ```
 
-### 质量优化
+### Quality Optimization
 
 ```python
 config = COCOConfig(
-    gdino_box_threshold=0.4,   # 提高阈值
-    gdino_text_threshold=0.3,  # 提高阈值
+    gdino_box_threshold=0.4,   # Increase threshold
+    gdino_text_threshold=0.3,  # Increase threshold
 )
 ```
 
-## 🐛 常见问题
+## 🐛 Common Issues
 
-### 1. GroundingDINO模型加载失败
+### 1. GroundingDINO Model Load Failure
 
-**问题**: 找不到配置文件或权重文件
+**Issue**: Config or weights file not found
 
-**解决**:
+**Solution**:
 ```bash
-# 检查文件是否存在
+# Check if files exist
 ls coco_data/GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py
 ls coco_data/GroundingDINO/weights/groundingdino_swint_ogc.pth
 
-# 如果不存在，重新下载
+# If not, re-download
 cd coco_data/GroundingDINO
 git pull
 mkdir -p weights
-wget -P weights <下载链接>
+wget -P weights <download_link>
 ```
 
-### 2. CUDA内存不足
+### 2. CUDA Out of Memory
 
-**解决方案**:
-1. 减少VLM并行worker数
-2. 使用CPU运行GroundingDINO: `gdino_device="cpu"`
-3. 批量处理：一次处理少量图片
+**Solution**:
+1. Reduce VLM worker count
+2. Use CPU for GroundingDINO: `gdino_device="cpu"`
+3. Batch Processing: Process fewer images at a time
 
-### 3. 检测结果为空
+### 3. Empty Detection Results
 
-**可能原因**:
-- VLM没有识别出类别
-- GroundingDINO阈值过高
-- 图片质量问题
+**Possible Causes**:
+- VLM failed to identify categories
+- GroundingDINO threshold too high
+- Image quality issues
 
-**解决**:
-1. 检查VLM输出: 查看日志中的categories
-2. 降低阈值: `gdino_box_threshold=0.25`
-3. 检查图片是否清晰
+**Solution**:
+1. Check VLM output: Check categories in logs
+2. Lower threshold: `gdino_box_threshold=0.25`
+3. Check if images are clear
 
-### 4. 类别名称不匹配
+### 4. Category Name Mismatch
 
-**问题**: VLM输出的类别GroundingDINO识别不了
+**Issue**: VLM output categories not recognized by GroundingDINO
 
-**解决**: VLM的prompt已经优化为输出GroundingDINO能理解的类别名称。如果仍有问题，可以添加类别映射。
+**Solution**: VLM prompt is optimized to output names GroundingDINO usually understands. If issues persist, add category mapping.
 
-## 📈 与COCO8数据集格式对比
+### 5. GroundingDINO Label Issues
 
-### COCO8结构
-```
-coco8/
-├── images/
-│   ├── train/
-│   └── val/
-├── labels/
-│   ├── train/
-│   └── val/
-└── README.md
-```
+**Solution**: Modify label names directly in `dataset.yaml` under `names` field. Refer to visualization results in `coco_dataset/visualizations/` correctly identify GroundingDINO outputs.
 
-### 生成的数据集结构
-```
-coco_dataset/
-├── images/              # 所有图片
-├── visualizations/      # 可视化结果
-├── annotations.json     # COCO标注
-└── dataset.yaml         # YOLO配置
-```
+## 🎓 Advanced Usage
 
-### 转换为COCO8格式
+### Custom VLM Prompts
 
-如果需要分train/val:
-
-```python
-# 在代码中添加数据集划分
-import random
-from shutil import copy2
-
-def split_dataset(images_dir, train_ratio=0.8):
-    """Split dataset into train/val."""
-    images = list(images_dir.glob("*.jpg"))
-    random.shuffle(images)
-    
-    split_idx = int(len(images) * train_ratio)
-    train_images = images[:split_idx]
-    val_images = images[split_idx:]
-    
-    # Create directories
-    (images_dir.parent / "images" / "train").mkdir(parents=True, exist_ok=True)
-    (images_dir.parent / "images" / "val").mkdir(parents=True, exist_ok=True)
-    
-    # Copy files
-    for img in train_images:
-        copy2(img, images_dir.parent / "images" / "train" / img.name)
-    for img in val_images:
-        copy2(img, images_dir.parent / "images" / "val" / img.name)
-```
-
-## 🎓 高级用法
-
-### 自定义VLM提示词
-
-在 `VLMCategoryDetector._create_category_prompt()` 中修改：
+Modify in `VLMCategoryDetector._create_category_prompt()`:
 
 ```python
 def _create_category_prompt(self) -> str:
-    return """针对这张图片，详细列出所有可见的物体。
+    return """List all visible objects in this image in detail.
 
-要求：
-- 使用英文名称
-- 尽可能详细和具体
-- 区分相似物体（如：red apple, green apple）
+Requirements:
+- Use English names
+- Be as detailed and specific as possible
+- Distinguish similar objects (e.g., red apple, green apple)
 
-输出JSON数组格式：
+Output JSON array format:
 ["person", "red apple", "wooden table"]"""
 ```
 
-### 添加后处理
+### Add Post-Processing
 
 ```python
 class GroundingDINODetector:
     def detect_boxes(self, image_path, categories):
         detections = self._raw_detect(image_path, categories)
         
-        # 非极大值抑制
+        # Non-Maximum Suppression
         detections = self._apply_nms(detections, iou_threshold=0.5)
         
-        # 过滤小目标
+        # Filter small objects
         detections = [d for d in detections if self._box_area(d['bbox']) > 0.01]
         
         return detections
 ```
 
-## 📚 参考资料
+## 📚 References
 
 - [GroundingDINO GitHub](https://github.com/IDEA-Research/GroundingDINO)
-- [Qwen-VL文档](https://github.com/QwenLM/Qwen-VL)
-- [COCO数据集格式](https://cocodataset.org/#format-data)
-- [YOLO训练指南](https://docs.ultralytics.com)
+- [Qwen-VL Documentation](https://github.com/QwenLM/Qwen-VL)
+- [COCO Dataset Format](https://cocodataset.org/#format-data)
+- [YOLO Training Guide](https://docs.ultralytics.com)
 
-## ✅ 检查清单
+## ✅ Checklist
 
-使用前确认：
-- [ ] VLM服务器已启动
-- [ ] GroundingDINO模型已下载
-- [ ] 输入数据已准备
-- [ ] GPU/CPU设置正确
-- [ ] 依赖包已安装
+Confirm before use:
+- [ ] VLM server started
+- [ ] GroundingDINO model downloaded
+- [ ] Input data prepared
+- [ ] GPU/CPU settings correct
+- [ ] Dependencies installed
 
-开始生成：
+Start Generation:
 ```bash
 python generate_coco_with_gdino.py
 ```
+
+## Roadmap
+
+1. Add UI
+2. Add support for SAM3
