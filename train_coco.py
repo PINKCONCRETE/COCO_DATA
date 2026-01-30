@@ -66,7 +66,7 @@ class TrainingConfig:
     # Output
     project: str = "runs/train"
     name: str = "coco_finetune"
-    exist_ok: bool = False  # Overwrite existing project/name
+    exist_ok: bool = True  # Overwrite existing project/name
     
     # Validation
     val: bool = True

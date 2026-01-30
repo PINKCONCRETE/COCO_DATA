@@ -5,6 +5,7 @@ input_data/*
 !input_data/README.txt
 
 vis_output/
+runs/
 
 *.pt
 *.pth
