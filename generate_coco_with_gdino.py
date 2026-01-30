@@ -228,22 +228,30 @@ class FrameExtractor:
             logger.error(f"Error processing image {image_path}: {e}")
             return None
     
-    def extract_all_frames(self) -> List[Tuple[int, Path]]:
-        """Extract frames from all videos and process all images."""
+    def extract_all_frames(self) -> Tuple[List[Tuple[int, Path]], List[Tuple[int, Path]]]:
+        """
+        Extract frames from all videos and process all images.
+        Returns:
+            all_frames: List of (image_id, path) for ALL extracted frames
+            representative_frames: List of (image_id, path), one per video/image source
+        """
         self.config.images_dir.mkdir(parents=True, exist_ok=True)
         
         videos, images = self.find_media_files()
         logger.info(f"Found {len(videos)} videos and {len(images)} images")
         
         all_results = []
+        representative_results = []
         current_id = 0
         
         if videos:
             logger.info("Extracting frames from videos...")
             for video in tqdm(videos, desc="Processing videos"):
                 results = self.extract_frames_from_video(video, current_id)
-                all_results.extend(results)
-                current_id = max([r[0] for r in results], default=current_id) + 1
+                if results:
+                    all_results.extend(results)
+                    representative_results.append(results[0])  # First frame of the video
+                    current_id = max([r[0] for r in results], default=current_id) + 1
         
         if images:
             logger.info("Processing images...")
@@ -251,10 +259,12 @@ class FrameExtractor:
                 result = self.process_image(img_path, current_id)
                 if result:
                     all_results.append(result)
+                    representative_results.append(result) # The image itself
                     current_id += 1
         
-        logger.info(f"Total frames/images extracted: {len(all_results)}")
-        return all_results
+        logger.info(f"Total frames extracted: {len(all_results)}")
+        logger.info(f"Representative frames: {len(representative_results)}")
+        return all_results, representative_results
 
 
 class VLMCategoryDetector:
@@ -765,7 +775,7 @@ class COCODatasetGenerator:
                 
                 # Must scan images to apply global prompt
                 logger.info("Scanning for images to apply global prompt...")
-                image_list = self.frame_extractor.extract_all_frames()
+                image_list, _ = self.frame_extractor.extract_all_frames()
                 if not image_list:
                     logger.error("No images found to process. Exiting.")
                     return
@@ -787,7 +797,7 @@ class COCODatasetGenerator:
         else:
             # Step 1: Extract frames
             logger.info("\n[Step 1/5] Extracting frames...")
-            image_list = self.frame_extractor.extract_all_frames()
+            image_list, representative_list = self.frame_extractor.extract_all_frames()
             
             if not image_list:
                 logger.error("No frames extracted. Exiting.")
@@ -797,15 +807,24 @@ class COCODatasetGenerator:
             logger.info(f"\n[Step 2/5] Detecting object categories with VLM...")
             
             if self.config.use_global_prompt:
-                # GLOBAL MODE: Run on first image only
-                logger.info("Running VLM on SAMPLE image only (Global Mode)...")
-                sample_id, sample_path = image_list[0]
+                # GLOBAL MODE: Run on representative frames (one per video/image)
+                logger.info(f"Running VLM on {len(representative_list)} representative frames (Global Mode)...")
                 
+                rep_categories = set()
                 with LocalImageServer(self.config.images_dir.parent, self.config.image_server_port):
-                    result = self.vlm_detector.detect_categories(sample_id, sample_path)
+                     with ProcessPoolExecutor(max_workers=self.config.vlm_workers) as executor:
+                        futures = [
+                            executor.submit(self.vlm_detector.detect_categories, img_id, img_path)
+                            for img_id, img_path in representative_list
+                        ]
+                        
+                        for future in tqdm(as_completed(futures), total=len(futures), desc="VLM Global Sampling"):
+                            result = future.result()
+                            if result['categories']:
+                                rep_categories.update(result['categories'])
                 
-                global_categories = result['categories']
-                logger.info(f"Proposed Global Categories: {global_categories}")
+                global_categories = sorted(list(rep_categories))
+                logger.info(f"Proposed Global Categories (Merged): {global_categories}")
                 
                 # Save just the list
                 global_json_path = self.config.output_dir / "global_categories.json"
@@ -994,7 +1013,7 @@ def main():
     config = COCOConfig(
         input_path=args.input,
         output_dir=args.output,
-        frame_interval=15,
+        frame_interval=6,
         num_workers=4,
         vlm_workers=8,
         visualize=True,

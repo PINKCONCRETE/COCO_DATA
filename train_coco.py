@@ -32,13 +32,19 @@ class TrainingConfig:
     dataset_yaml: Path = Path("coco_dataset/dataset.yaml")
     
     # Model
-    model_path: str = "yolo26x.pt"  # Pretrained model
+    # TIP: 'yolo26n.pt' (Nano) is much faster than 'yolo26x.pt' (Extra Large).
+    # Use 'n' for speed/testing, 'x' for maximum accuracy.
+    model_path: str = "yolo26x.pt" 
     
     # Training parameters
     epochs: int = 100
     imgsz: int = 640
     batch_size: int = 16
     device: str = "0"  # GPU device, use "cpu" for CPU, "0,1,2,3" for multi-GPU
+    
+    # Performance optimization
+    cache: bool = True       # Cache images to RAM for faster training
+    amp: bool = True         # Automatic Mixed Precision (faster on modern GPUs)
     
     # Optimization
     optimizer: str = "SGD"  # SGD, Adam, AdamW
@@ -119,6 +125,10 @@ class YOLOTrainer:
             imgsz=self.config.imgsz,
             batch=self.config.batch_size,
             device=self.config.device,
+            
+            # Performance
+            cache=self.config.cache,
+            amp=self.config.amp,
             
             # Optimization
             optimizer=self.config.optimizer,
