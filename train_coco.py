@@ -222,7 +222,7 @@ def main():
     config = TrainingConfig(
         dataset_yaml=Path("coco_dataset/dataset.yaml"),
         model_path="yolo26x.pt",
-        epochs=500,
+        epochs=5000,
         imgsz=640,
         batch_size=16,
         device="0",  # Change to "cpu" if no GPU available

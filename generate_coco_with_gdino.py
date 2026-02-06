@@ -277,7 +277,6 @@ class VLMCategoryDetector:
     def _create_category_prompt(self) -> str:
         """Create prompt for category detection only."""
         return """Analyze this image and list ALL objects you can see.
-
 Output ONLY a JSON array of object names in this exact format:
 ["person", "car", "dog", "cat", "chair", "book", "cup"]
 
@@ -1013,7 +1012,7 @@ def main():
     config = COCOConfig(
         input_path=args.input,
         output_dir=args.output,
-        frame_interval=6,
+        frame_interval=30,
         num_workers=4,
         vlm_workers=8,
         visualize=True,
