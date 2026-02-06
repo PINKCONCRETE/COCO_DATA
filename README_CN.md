@@ -420,7 +420,43 @@ class GroundingDINODetector:
         return detections
 ```
 
-## 📚 参考资料
+## �️ 辅助工具
+
+### 标注可视化与微调工具 (Label Editor)
+
+本项目提供了一个基于 **Tkinter** (Python内置GUI库) 的轻量级可视化工具，用于查看和微调自动生成的YOLO格式标注。它不需要额外安装PyQt等复杂依赖，即开即用。
+
+**功能特点：**
+- 🖼️ **可视化查看**：直观显示图片和对应的YOLO标注框。
+- ✏️ **交互式编辑**：
+  - **画框模式 (Draft Mode)**：按 `W` 切换，拖拽鼠标画新框。
+  - **编辑模式 (Edit Mode)**：按 `E` 切换，点击选中框。
+- 🏷️ **类别修改**：选中框后，在右侧下拉框更改类别。
+- 🗑️ **删除标注**：选中框后按 `Delete` 删除。
+- 💾 **自动关联**：打开图片目录自动寻找对应的 `labels` 目录和 `dataset.yaml` 类别配置。
+
+**运行方式：**
+
+确保已按照前文安装好基础依赖（主要是 Pillow）：
+
+```bash
+python label_editor.py
+```
+
+**使用简易指南：**
+1. **启动工具**：运行 `python label_editor.py`。
+2. **打开数据集**：点击 "Open Dir"，**选择数据集根目录**（例如 `coco_dataset`）或具体的图片子目录（例如 `coco_dataset/images/train`）。
+   - 如果选择根目录，工具会自动递归加载 `images/train`、`images/val`、`images/test` 下的所有图片。
+   - 工具会自动寻找对应的 `labels/` 目录下的标签文件。
+3. **加载**：工具会自动显示文件列表，并加载第一张图片的标签。
+4. **操作**：
+   - **新增**：切换到 "Draw Mode" (W)，拖拽画框。
+   - **修改**：切换到 "Edit Mode" (E)，点击选中框，修改右侧类别。
+   - **删除**：选中框，按 Delete 键或点击按钮。
+   - **编辑类别**：点击 "Edit Class List" 按钮，可以增加、修改 `dataset.yaml` 中的类别名称。
+   - **保存**：点击 "Save" 或按 Ctrl+S。
+
+## �📚 参考资料
 
 - [GroundingDINO GitHub](https://github.com/IDEA-Research/GroundingDINO)
 - [Qwen-VL文档](https://github.com/QwenLM/Qwen-VL)

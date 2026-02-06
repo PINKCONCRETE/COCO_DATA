@@ -415,7 +415,43 @@ class GroundingDINODetector:
         return detections
 ```
 
-## 📚 References
+## �️ Auxiliary Tools
+
+### Annotation Visualization & Fine-tuning Tool (Label Editor)
+
+This project provides a lightweight GUI tool based on **Tkinter** (Python's built-in GUI library) for viewing and fine-tuning the automatically generated YOLO format annotations. It requires no complex dependencies like PyQt and works out of the box.
+
+**Features:**
+- 🖼️ **Visualization**: Intuitively display images and corresponding YOLO bounding boxes.
+- ✏️ **Interactive Editing**:
+  - **Draw Mode**: Press `W` to switch, drag to draw new boxes.
+  - **Edit Mode**: Press `E` to switch, click to select boxes.
+- 🏷️ **Category Modification**: Select a box and change its class in the sidebar.
+- 🗑️ **Delete**: Select a box and press `Delete`.
+- 💾 **Auto-Association**: Automatically finds corresponding `labels` directory and `dataset.yaml` config.
+
+**How to Run:**
+
+Ensure base dependencies (mainly Pillow) are installed:
+
+```bash
+python label_editor.py
+```
+
+**Quick Guide:**
+1. **Start**: Run `python label_editor.py`.
+2. **Open Dataset**: Click "Open Dir" and **select the dataset root** (e.g., `coco_dataset`) or a specific image subdirectory.
+   - If root is selected, it recursively loads images from `images/train`, `images/val`, and `images/test`.
+   - It automatically maps images to their corresponding labels in the `labels/` directory.
+3. **Load**: The file list populates, and the first image loads with annotations.
+4. **Edit**:
+   - **Add**: Switch to "Draw Mode" (W), drag to draw.
+   - **Modify**: Switch to "Edit Mode" (E), select box, change class.
+   - **Delete**: Select box, press Delete.
+   - **Edit Classes**: Click "Edit Class List" to add or rename classes in `dataset.yaml`.
+   - **Save**: Click "Save" or Press Ctrl+S.
+
+## �📚 References
 
 - [GroundingDINO GitHub](https://github.com/IDEA-Research/GroundingDINO)
 - [Qwen-VL Documentation](https://github.com/QwenLM/Qwen-VL)
